@@ -1,0 +1,16 @@
+#Python unwanted files
+**/__pycache__/
+*.pyc
+
+#Virtual Environment
+.venv_mid/
+.venv/
+
+#Environment Varible
+.env
+
+#VS Code Setting
+.vscode/launch.json
+.vscode/setting.json
+
+#Folder to skip. Research/Testing files for R&D
