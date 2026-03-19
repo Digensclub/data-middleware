@@ -53,6 +53,7 @@ EXPOSE 8000
 CMD ["gunicorn", "apps.main:app", \
      "--workers","9", \
      "--worker-class", "uvicorn.workers.UvicornWorker", \
+     "--timeout", "120", \
      "--bind", "0.0.0.0:8000"]
 
 #--- uvicorn Only. Use below lines when running the app on Kubernets. Kubernets will handle the pod. ---
