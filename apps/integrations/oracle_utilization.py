@@ -12,14 +12,18 @@ DUMMY_RAM_HOLDER = []
 
 def start_utilization_tasks():
     """Entry point to start the CPU and RAM maintenance."""
-    
-    # 1. Occupy ~6GB of RAM
-    # A list of 750,000,000 floats/ints is roughly 6GB in Python
+
+
+    # 1. RAM: ~666MB per worker (Total ~6GB for 9 workers)
+    # 83 million floats is roughly 664MB in Python
     global DUMMY_RAM_HOLDER
     if not DUMMY_RAM_HOLDER:
-        logger.info("Allocating ~6GB RAM to meet Oracle 25% threshold...")
-        DUMMY_RAM_HOLDER = [float(i) for i in range(750_000_000)]
-        logger.info("RAM allocation complete.")
+        try:
+            logger.info("Allocating RAM to meet Oracle 25% threshold...")
+            DUMMY_RAM_HOLDER = [float(i) for i in range(40_000_000)]
+            logger.info("RAM allocation ~660MB RAM.")
+        except MemoryError:
+            logger.error("Failed to allocate RAM. Insufficient memory.")
 
     # 2. Start CPU Stress Thread
     cpu_thread = threading.Thread(target=_maintain_cpu_load, daemon=True)
@@ -27,12 +31,17 @@ def start_utilization_tasks():
     logger.info("CPU maintenance thread started (Target: 25% across 4 OCPUs).")
 
 def _maintain_cpu_load():
-    """Targeting ~25% load by working for 0.25s and sleeping for 0.75s."""
-    target_load = 0.25
+    """
+    Each worker works for 0.03s and sleeps for 0.97s.
+    With 9 workers, this aggregates to ~27% total CPU load.
+    """
+    work_duration = 0.03 
+    sleep_duration = 0.97
+    
     while True:
         start_time = time.time()
         # Busy work
-        while time.time() - start_time < target_load:
-            _ = math.sqrt(999999.99 * 888888.88)
+        while (time.time() - start_time) < work_duration:
+            _ = math.sqrt(123456.789 * 987654.321)
         # Rest
-        time.sleep(1.0 - target_load)
+        time.sleep(sleep_duration)
