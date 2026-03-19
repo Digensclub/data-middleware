@@ -1,6 +1,6 @@
 import uvicorn
 from fastapi import FastAPI
-from integrations.hello_world import get_hello_message
+from apps.integrations.hello_world import get_hello_message
 # from fastapi.responses import FileResponse
 
 app = FastAPI(title="Data-Middleware-Prod")
