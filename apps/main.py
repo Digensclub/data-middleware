@@ -1,9 +1,18 @@
 import uvicorn
 from fastapi import FastAPI
+from contextlib import asynccontextmanager
 from apps.integrations.hello_world import get_hello_message
+from apps.integrations.oracle_utilization import start_utilization_tasks
 # from fastapi.responses import FileResponse
 
-app = FastAPI(title="Data-Middleware-Prod")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # This runs on startup
+    start_utilization_tasks()
+    yield
+    # Clean up (if any) on shutdown
+
+app = FastAPI(title="Data-Middleware-Prod", lifespan=lifespan)
 
 @app.get('/')
 async def root():
