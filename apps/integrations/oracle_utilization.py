@@ -30,7 +30,7 @@ def manage_utilization(active: bool, ram_count: int = 40_000_000):
                     logger.error(f"Failed to allocate {ram_count} floats: Out of memory.")
                     DUMMY_RAM_HOLDER = [] # Ensure it stays empty on failure
             
-            # Start CPU thread if not already running
+            # Start CPU thread if not already in running state.
             if not any(t.name == "OracleStressor" for t in threading.enumerate()):
                 threading.Thread(target=_cpu_stress, daemon=True, name="OracleStressor").start()
                 logger.info("CPU stress thread started.")
@@ -55,18 +55,15 @@ def _cpu_stress():
             start = time.time()
             # 3% duty cycle roughly
             while time.time() - start < 0.03:
-                _ = math.sqrt(999.99)
-            
+                            _ = math.sqrt(999.99)
             # Increment and release lock quickly
             with COUNTER_LOCK:
                 GLOBAL_CYCLE_TOTAL += 1
                 current_total = GLOBAL_CYCLE_TOTAL
 
                 logger.info(f"Cycle finished. Global Total: {current_total}")
-                # Returns True immediately if STOP_EVENT is set, 
-                # otherwise waits for 0.97s.
-                if STOP_EVENT.wait(0.97): 
-                    break
+
+            time.sleep(0.97)
             logger.info("Completed CPU stress cycle, sleeping for 0.97s.")
     except Exception as e:
         logger.error(f"CPU stress thread encountered an error: {e}")
