@@ -1,47 +1,72 @@
-import time
-import math
-import threading
-import logging
+import time, math, threading, logging
 
 # Setup basic logging to see it in your Docker logs
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("oracle_utilization")
 
 # 25% of 24GB is 6GB. 
 # We'll use a list of large floats to occupy space.
 DUMMY_RAM_HOLDER = []
+STOP_EVENT = threading.Event()
+GLOBAL_CYCLE_TOTAL = 0
+COUNTER_LOCK = threading.Lock()
 
-def start_utilization_tasks():
+def manage_utilization(active: bool, ram_count: int = 40_000_000):
     """Entry point to start the CPU and RAM maintenance."""
-
-
     # 1. RAM: ~666MB per worker (Total ~6GB for 9 workers)
-    # 83 million floats is roughly 664MB in Python
-    global DUMMY_RAM_HOLDER
-    if not DUMMY_RAM_HOLDER:
-        try:
-            logger.info("Allocating RAM to meet Oracle 25% threshold...")
-            DUMMY_RAM_HOLDER = [float(i) for i in range(40_000_000)]
-            logger.info("RAM allocation ~660MB RAM.")
-        except MemoryError:
-            logger.error("Failed to allocate RAM. Insufficient memory.")
+    # 40 million floats is roughly 664MB in Python (since a float is 8 bytes, 40M * 8 = 320MB, but Python's overhead makes it larger)
+    global DUMMY_RAM_HOLDER, GLOBAL_CYCLE_TOTAL
+    
+    try:
+        if active:
+            STOP_EVENT.clear()
+            # Allocate RAM if empty
+            if not DUMMY_RAM_HOLDER:
+                try:
+                    logger.info("Allocating RAM to meet Oracle 25% threshold...")
+                    DUMMY_RAM_HOLDER = [float(i) for i in range(ram_count)]
+                    logger.info(f"Allocated {ram_count} floats.")
+                except MemoryError:
+                    logger.error(f"Failed to allocate {ram_count} floats: Out of memory.")
+                    DUMMY_RAM_HOLDER = [] # Ensure it stays empty on failure
+            
+            # Start CPU thread if not already running
+            if not any(t.name == "OracleStressor" for t in threading.enumerate()):
+                threading.Thread(target=_cpu_stress, daemon=True, name="OracleStressor").start()
+                logger.info("CPU stress thread started.")
+        else:
+            # Stop CPU and Free RAM
+            STOP_EVENT.set()
+            DUMMY_RAM_HOLDER = []
+            logger.info("Utilization stopped and RAM cleared.")
+            
+    except Exception as e:
+        logger.error(f"Error managing utilization: {e}")
 
-    # 2. Start CPU Stress Thread
-    cpu_thread = threading.Thread(target=_maintain_cpu_load, daemon=True)
-    cpu_thread.start()
-    logger.info("CPU maintenance thread started (Target: 25% across 4 OCPUs).")
-
-def _maintain_cpu_load():
+def _cpu_stress():
     """
     Each worker works for 0.03s and sleeps for 0.97s.
     With 9 workers, this aggregates to ~27% total CPU load.
     """
-    work_duration = 0.03 
-    sleep_duration = 0.97
-    
-    while True:
-        start_time = time.time()
-        # Busy work
-        while (time.time() - start_time) < work_duration:
-            _ = math.sqrt(123456.789 * 987654.321)
-        # Rest
-        time.sleep(sleep_duration)
+    global GLOBAL_CYCLE_TOTAL
+    try:
+        while not STOP_EVENT.is_set():
+            logger.info("Starting CPU stress cycle.")
+            start = time.time()
+            # 3% duty cycle roughly
+            while time.time() - start < 0.03:
+                _ = math.sqrt(999.99)
+            
+            # Increment and release lock quickly
+            with COUNTER_LOCK:
+                GLOBAL_CYCLE_TOTAL += 1
+                current_total = GLOBAL_CYCLE_TOTAL
+
+                logger.info(f"Cycle finished. Global Total: {current_total}")
+                # Returns True immediately if STOP_EVENT is set, 
+                # otherwise waits for 0.97s.
+                if STOP_EVENT.wait(0.97): 
+                    break
+            logger.info("Completed CPU stress cycle, sleeping for 0.97s.")
+    except Exception as e:
+        logger.error(f"CPU stress thread encountered an error: {e}")
